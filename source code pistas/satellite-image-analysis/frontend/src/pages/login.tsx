@@ -2,7 +2,7 @@
  * Login page component
  * filepath: frontend/src/pages/login.tsx
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
 import AuthLayout from '../components/layout/AuthLayout';
@@ -14,30 +14,98 @@ const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
+  
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, router]);
 
-  // TODO: Implement form submission handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Validate inputs and call login function
+    
+    // Reset error state
+    setError(null);
+    
+    // Basic validation
+    if (!username.trim()) {
+      setError('Username is required');
+      return;
+    }
+    
+    if (!password.trim()) {
+      setError('Password is required');
+      return;
+    }
+    
+    try {
+      await login(username, password);
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.');
+    }
   };
 
   return (
     <AuthLayout>
-      <div className="login-container">
-        <h1 className="text-2xl font-bold mb-6">Login</h1>
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Satellite Image Analysis</h1>
+          <h2 className="text-xl font-semibold text-gray-700">Login</h2>
+        </div>
         
-        {/* TODO: Implement login form with validation */}
-        <form onSubmit={handleSubmit}>
-          {/* Username input */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+              Username
+            </label>
+            <Input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your username"
+              className="w-full mt-1"
+              disabled={isLoading}
+            />
+          </div>
           
-          {/* Password input */}
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              className="w-full mt-1"
+              disabled={isLoading}
+            />
+          </div>
           
-          {/* Submit button */}
+          {error && (
+            <div className="text-red-500 text-sm font-medium">
+              {error}
+            </div>
+          )}
           
-          {error && <p className="text-red-500 mt-2">{error}</p>}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Logging in...' : 'Login'}
+          </Button>
         </form>
+        
+        <div className="text-center text-sm text-gray-600">
+          Contact your administrator if you need an account
+        </div>
       </div>
     </AuthLayout>
   );

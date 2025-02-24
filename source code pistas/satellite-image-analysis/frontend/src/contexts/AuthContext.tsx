@@ -5,14 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/router';
 import jwtDecode from 'jwt-decode';
-import authService from '../services/authService';
-
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  isAdmin: boolean;
-}
+import authService, { User } from '../services/authService';
 
 interface AuthContextType {
   user: User | null;
@@ -43,16 +36,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // TODO: Implement token validation and user loading from localStorage
-  
-  // TODO: Implement login function
+  // Load user data on initial render
+  useEffect(() => {
+    async function loadUser() {
+      setIsLoading(true);
+      try {
+        // Check if token exists and is valid
+        if (authService.isAuthenticated()) {
+          const userData = await authService.getCurrentUser();
+          setUser(userData);
+        }
+      } catch (err) {
+        console.error('Failed to load user:', err);
+        setError('Session expired. Please login again.');
+        authService.logout();
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadUser();
+  }, []);
+
   const login = async (username: string, password: string) => {
-    // Call authService.login and handle response
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const userData = await authService.login({ username, password });
+      setUser(userData);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Login failed. Please check your credentials.';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // TODO: Implement logout function
   const logout = () => {
-    // Clear user data and token
+    authService.logout();
+    setUser(null);
+    router.push('/login');
   };
 
   // Value object to be provided by the context

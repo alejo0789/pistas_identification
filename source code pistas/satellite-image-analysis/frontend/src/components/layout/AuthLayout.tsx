@@ -1,42 +1,46 @@
 /**
- * Authentication layout component for login and registration pages
+ * Authentication layout for login and register pages
  * filepath: frontend/src/components/layout/AuthLayout.tsx
  */
 import React, { ReactNode } from 'react';
+import Head from 'next/head';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 
 interface AuthLayoutProps {
   children: ReactNode;
+  title?: string;
 }
 
-const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
-  const router = useRouter();
-  
+const AuthLayout: React.FC<AuthLayoutProps> = ({ 
+  children, 
+  title = 'Satellite Image Analysis' 
+}) => {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
-      <header className="bg-white shadow-sm py-4">
-        <div className="container mx-auto px-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold text-blue-600">
-              Satellite Image Analysis
+    <>
+      <Head>
+        <title>{title}</title>
+        <meta name="description" content="Satellite Image Analysis Platform" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="flex justify-center">
+            <Link href="/" className="flex items-center">
+              <span className="text-blue-600 text-2xl font-bold">SatAnalysis</span>
             </Link>
           </div>
         </div>
-      </header>
-      
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-white rounded-lg shadow-md p-8">
+
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           {children}
         </div>
-      </main>
-      
-      <footer className="bg-white py-4 shadow-inner">
-        <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-          &copy; {new Date().getFullYear()} Satellite Image Analysis. All rights reserved.
+        
+        <div className="mt-6 text-center text-sm text-gray-500">
+          <span>&copy; {new Date().getFullYear()} Satellite Image Analysis</span>
         </div>
-      </footer>
-    </div>
+      </div>
+    </>
   );
 };
 
