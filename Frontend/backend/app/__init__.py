@@ -8,9 +8,6 @@ from flask_jwt_extended import JWTManager
 from .config import get_config
 from .database import db, init_db
 
-# Import API route registrations
-from .api import register_blueprints
-
 def create_app(config_name=None):
     """Create and configure the Flask application"""
     app = Flask(__name__)
@@ -21,8 +18,8 @@ def create_app(config_name=None):
     # Setup CORS
     CORS(app)
     
-    # Initialize database
-    init_db(app)
+    # Initialize database with app
+    db.init_app(app)
     
     # Setup JWT
     jwt = JWTManager(app)
@@ -32,7 +29,12 @@ def create_app(config_name=None):
     os.makedirs(app.config['REPORTS_FOLDER'], exist_ok=True)
     
     # Register API routes
+    from .api import register_blueprints
     register_blueprints(app)
+    
+    # Initialize database within app context
+    with app.app_context():
+        init_db(app)
     
     @app.route('/health')
     def health_check():

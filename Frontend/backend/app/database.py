@@ -2,25 +2,28 @@
 Database connection and utilities
 """
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.sql import func
 
-# Initialize SQLAlchemy instance
+# Initialize SQLAlchemy instance - THIS SHOULD BE THE ONLY INSTANCE IN THE APP
 db = SQLAlchemy()
 
 def init_db(app):
     """Initialize the database with the application"""
-    with app.app_context():
-        # Import models here to avoid circular imports
-        from app.models.user import User
-        from app.models.analysis_settings import AnalysisSettings
-        from app.models.analysis import Analysis
-        
-        # Create all tables
-        db.create_all()
-        
-        # Create a default admin user if none exists
-        admin = User.query.filter_by(username='admin').first()
-        if not admin:
+    # We don't need to call db.init_app(app) here since it's called in app/__init__.py
+    # Just create tables and initialize data
+    
+    # Import models here to avoid circular imports
+    from app.models.user import User
+    from app.models.analysis_settings import AnalysisSettings
+    from app.models.analysis import Analysis
+    
+    # Create all tables
+    db.create_all()
+    
+    # Create a default admin user if none exists
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        try:
+            from app.utils.security import hash_password
             admin = User(
                 username='admin',
                 email='admin@example.com',
@@ -36,5 +39,8 @@ def init_db(app):
             
             db.session.commit()
             print("Default admin user created!")
-            
-        print("Database initialized successfully!")
+        except Exception as e:
+            print(f"Error creating admin user: {str(e)}")
+            db.session.rollback()
+    
+    print("Database initialized successfully!")
