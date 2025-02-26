@@ -4,7 +4,6 @@
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/router';
-import * as jwt_decode from 'jwt-decode'; // Changed to named import
 import authService, { User } from '../services/authService';
 
 interface AuthContextType {
@@ -12,8 +11,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   error: string | null;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,14 +36,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  // Clear error function
+  const clearError = () => setError(null);
+
   // Load user from localStorage on component mount
   useEffect(() => {
     const loadUser = async () => {
       try {
+        setIsLoading(true);
         const currentUser = await authService.getCurrentUser();
         setUser(currentUser);
+        setError(null);
       } catch (err) {
         console.error('Error loading user:', err);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -54,26 +60,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Login function
   const login = async (username: string, password: string) => {
-    setError(null);
+    clearError();
     setIsLoading(true);
     
     try {
       const userData = await authService.login({ username, password });
       setUser(userData);
       router.push('/dashboard');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login error:', err);
-      setError('Invalid username or password');
+      setError(err.message || 'Invalid username or password');
+      throw err; // Re-throw to allow components to also handle the error
     } finally {
       setIsLoading(false);
     }
   };
 
   // Logout function
-  const logout = () => {
-    authService.logout();
-    setUser(null);
-    router.push('/login');
+  const logout = async () => {
+    setIsLoading(true);
+    try {
+      await authService.logout();
+      setUser(null);
+      router.push('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+      // Even if backend logout fails, we still clear local state
+      setUser(null);
+      router.push('/login');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Value object to be provided by the context
@@ -83,7 +100,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     login,
     logout,
-    error
+    error,
+    clearError
   };
 
   return (

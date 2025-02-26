@@ -1,75 +1,78 @@
 /**
- * Reusable Button component with various styles and sizes
+ * Reusable Button component
  * filepath: frontend/src/components/ui/Button.tsx
  */
-import React, { ButtonHTMLAttributes, ReactNode } from 'react';
+import React, { ButtonHTMLAttributes } from 'react';
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  children: ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'success';
-  size?: 'sm' | 'md' | 'lg';
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  children: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'small';
+  color?: 'primary' | 'secondary' | 'danger';
+  fullWidth?: boolean;
   isLoading?: boolean;
-  icon?: ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
   children,
   variant = 'primary',
-  size = 'md',
+  color = 'primary',
+  fullWidth = false,
   isLoading = false,
-  icon,
   className = '',
   disabled,
   ...props
 }) => {
-  // Base classes
-  const baseClasses = [
-    'btn',
-    `btn-${variant}`,
-    `btn-${size}`,
-  ];
-
-  // Loading state
-  if (isLoading) {
-    baseClasses.push('relative !text-transparent');
+  // Base styles
+  let baseStyles = 'focus:outline-none transition duration-150 ease-in-out';
+  
+  // Size and shape
+  let sizeStyles = '';
+  if (variant === 'small') {
+    sizeStyles = 'px-3 py-1 text-sm';
+  } else {
+    sizeStyles = 'px-5 py-2 font-medium';
   }
-
+  
+  // Color styles
+  let colorStyles = '';
+  if (color === 'primary') {
+    colorStyles = 'bg-blue-600 hover:bg-blue-700 text-white';
+  } else if (color === 'secondary') {
+    colorStyles = 'bg-gray-200 hover:bg-gray-300 text-gray-800';
+  } else if (color === 'danger') {
+    colorStyles = 'bg-red-600 hover:bg-red-700 text-white';
+  }
+  
+  // Width
+  let widthStyles = fullWidth ? 'w-full' : '';
+  
+  // Disabled state
+  let disabledStyles = (disabled || isLoading) 
+    ? 'opacity-50 cursor-not-allowed' 
+    : 'hover:shadow-md';
+  
+  // Rounded corners
+  let roundedStyles = 'rounded-md';
+  
+  // Combine all styles
+  const buttonStyles = `${baseStyles} ${sizeStyles} ${colorStyles} ${widthStyles} ${disabledStyles} ${roundedStyles} ${className}`;
+  
   return (
-    <button 
-      className={`${baseClasses.join(' ')} ${className}`} 
+    <button
+      className={buttonStyles}
       disabled={disabled || isLoading}
       {...props}
     >
-      {icon && !isLoading && (
-        <span className="mr-2">{icon}</span>
-      )}
-      
-      {children}
-      
-      {isLoading && (
-        <span className="absolute inset-0 flex items-center justify-center">
-          <svg 
-            className="animate-spin h-5 w-5 text-white" 
-            xmlns="http://www.w3.org/2000/svg" 
-            fill="none" 
-            viewBox="0 0 24 24"
-          >
-            <circle 
-              className="opacity-25" 
-              cx="12" 
-              cy="12" 
-              r="10" 
-              stroke="currentColor" 
-              strokeWidth="4"
-            />
-            <path 
-              className="opacity-75" 
-              fill="currentColor" 
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-        </span>
+      {isLoading ? (
+        <div className="flex items-center justify-center">
+          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"></div>
+          <span>Loading...</span>
+        </div>
+      ) : (
+        children
       )}
     </button>
   );
 };
+
+export default Button;

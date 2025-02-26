@@ -6,23 +6,59 @@ import React, { InputHTMLAttributes } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
+  label?: string;
+  fullWidth?: boolean;
 }
 
-export const Input: React.FC<InputProps> = ({ 
+export const Input: React.FC<InputProps> = ({
+  error,
+  label,
+  fullWidth = false,
   className = '',
-  error, 
-  ...props 
+  id,
+  ...props
 }) => {
-  const baseClasses = "px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
-  const errorClasses = error ? "border-red-300 text-red-900 placeholder-red-300" : "border-gray-300";
-  const disabledClasses = props.disabled ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "";
+  // Generate a random ID if not provided
+  const inputId = id || `input-${Math.random().toString(36).substring(2, 9)}`;
+  
+  // Base styles
+  const baseStyles = 'border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200';
+  
+  // Error styles
+  const errorStyles = error 
+    ? 'border-red-500' 
+    : 'border-gray-300';
+  
+  // Width styles
+  const widthStyles = fullWidth 
+    ? 'w-full' 
+    : '';
+  
+  // Disabled styles
+  const disabledStyles = props.disabled 
+    ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
+    : '';
+  
+  // Combine all styles
+  const inputStyles = `${baseStyles} ${errorStyles} ${widthStyles} ${disabledStyles} ${className}`;
   
   return (
-    <div className="w-full">
+    <div className={`input-container ${fullWidth ? 'w-full' : ''}`}>
+      {label && (
+        <label 
+          htmlFor={inputId} 
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          {label}
+        </label>
+      )}
+      
       <input
-        className={`${baseClasses} ${errorClasses} ${disabledClasses} ${className}`}
+        id={inputId}
+        className={inputStyles}
         {...props}
       />
+      
       {error && (
         <p className="mt-1 text-sm text-red-600">{error}</p>
       )}

@@ -1,82 +1,68 @@
-/**
- * Base API service with axios instance and interceptors
- * filepath: frontend/src/services/api.ts
- */
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-import { IncomingMessage } from 'http';
+// Update your api.ts file with this code
 
-// Create a type to fix the compatibility issue with AxiosRequestConfig
-interface CustomRequestConfig extends AxiosRequestConfig {
-  _retry?: boolean;
-}
+import axios from 'axios';
 
-// Create a base axios instance with common configuration
-const api: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
+// Create a custom axios instance
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json'
-  },
-  timeout: 10000 // 10 seconds timeout
+  }
 });
 
-// Request interceptor for API calls
+// Request interceptor - add auth token
 api.interceptors.request.use(
-  (config: AxiosRequestConfig) => {
+  (config) => {
     const token = localStorage.getItem('auth_token');
-    if (token && config.headers) {
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error: AxiosError) => {
+  (error) => {
     return Promise.reject(error);
   }
 );
 
-// Response interceptor for API calls
+// Response interceptor - standardize errors
 api.interceptors.response.use(
-  (response: AxiosResponse) => {
-    return response;
-  },
-  async (error: AxiosError) => {
-    const originalRequest = error.config as CustomRequestConfig;
+  (response) => response,
+  (error) => {
+    // Create standardized error object
+    let message = 'An unexpected error occurred';
     
-    // Handle unauthorized errors (expired token)
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      // In a real application, you might want to implement token refresh logic here
-      // For now, we'll just redirect to login
-      if (typeof window !== 'undefined') {
-        // Clear token
-        localStorage.removeItem('auth_token');
-        
-        // Redirect to login page
-        window.location.href = '/login';
+    if (error.response) {
+      // Server responded with error status
+      if (error.response.data && error.response.data.error) {
+        message = error.response.data.error;
+      } else if (error.response.status === 401) {
+        message = 'Unauthorized: Please log in again';
+      } else if (error.response.status === 404) {
+        message = 'Resource not found';
+      } else if (error.response.status === 500) {
+        message = 'Server error: Please try again later';
       }
-      
-      return Promise.reject(error);
+    } else if (error.request) {
+      // Request made but no response
+      message = 'No response from server: Check your connection';
+    } else {
+      // Error setting up request
+      message = error.message || 'Error preparing request';
     }
     
-    // Handle server errors
-    if (error.response?.status === 500) {
-      console.error('Server error:', error);
-      // You can add custom error handling for server errors
-    }
+    // Create standardized error
+    const standardError = new Error(message);
     
-    // Network errors
-    if (error.message === 'Network Error') {
-      console.error('Network error - API server might be down');
-      // You can add custom handling for network errors
-    }
+    // Log for debugging
+    console.error('API Error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      message: message
+    });
     
-    return Promise.reject(error);
+    return Promise.reject(standardError);
   }
 );
-
-// Handle request cancellation
-export const createCancelToken = () => {
-  return axios.CancelToken.source();
-};
 
 export default api;

@@ -3,8 +3,7 @@
  * filepath: frontend/src/services/authService.ts
  */
 import api from './api';
-import jwtDecode from 'jwt-decode';
-import { AxiosResponse } from 'axios';
+import * as jwt_decode from 'jwt-decode';
 
 // User interfaces
 export interface User {
@@ -26,16 +25,15 @@ export interface UserRegistration {
 }
 
 export interface AuthResponse {
-  access_token: string;
-  token_type: string;
+  token: string;
+  user: User;
 }
 
 export interface DecodedToken {
-  sub: string; // username
-  exp: number; // expiration time
-  iat: number; // issued at time
-  user_id: number;
+  id: number;
+  username: string;
   is_admin: boolean;
+  exp: number;
 }
 
 const TOKEN_KEY = 'auth_token';
@@ -44,52 +42,97 @@ const authService = {
   // Login user and store token
   login: async (credentials: UserCredentials): Promise<User> => {
     try {
-      // TODO: Implement actual API call
-      // const response = await api.post<AuthResponse>('/auth/login', credentials);
-      // const { access_token } = response.data;
+      const response = await api.post('/auth/login', credentials);
       
-      // For development, create a fake token response
-      const access_token = 'fake_token';
+      // Check if the response and data are valid
+      if (!response || !response.data) {
+        throw new Error('Invalid server response');
+      }
+      
+      // Extract token and user from response
+      const token = response.data.token;
+      const user = response.data.user;
+      
+      // Validate token and user data
+      if (!token) {
+        throw new Error('No authentication token received');
+      }
+      
+      if (!user || !user.id) {
+        throw new Error('Invalid user data received');
+      }
       
       // Store token in localStorage
-      localStorage.setItem(TOKEN_KEY, access_token);
+      localStorage.setItem(TOKEN_KEY, token);
       
-      // Return user info
-      return {
-        id: 1,
-        username: credentials.username,
-        email: `${credentials.username}@example.com`,
-        isAdmin: false
-      };
-    } catch (error) {
+      return user;
+    } catch (error: any) {
+      // Handle various error scenarios
       console.error('Login failed:', error);
-      throw error;
+      
+      // Extract error message from response if available
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.response) {
+        // Server responded with error status
+        if (error.response.status === 401) {
+          errorMessage = 'Invalid username or password';
+        } else if (error.response.status === 404) {
+          errorMessage = 'User not found';
+        } else if (error.response.data && error.response.data.error) {
+          // Use error message from API if available
+          errorMessage = error.response.data.error;
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'No response from server. Please check your connection.';
+      } else if (error.message) {
+        // Use error message if available
+        errorMessage = error.message;
+      }
+      
+      // Create a new error with the message
+      const formattedError = new Error(errorMessage);
+      
+      // Add properties to help with debugging
+      (formattedError as any).originalError = error;
+      (formattedError as any).status = error.response?.status;
+      
+      throw formattedError;
     }
   },
 
-  // Register new user
+  // Register new user (admin only)
   register: async (userData: UserRegistration): Promise<User> => {
     try {
-      // TODO: Implement actual API call
-      // const response = await api.post<User>('/auth/register', userData);
-      // return response.data;
-      
-      // For development
-      return {
-        id: 1,
-        username: userData.username,
-        email: userData.email,
-        isAdmin: false
-      };
-    } catch (error) {
+      const response = await api.post('/auth/register', userData);
+      return response.data.user;
+    } catch (error: any) {
       console.error('Registration failed:', error);
-      throw error;
+      
+      let errorMessage = 'Registration failed';
+      if (error.response && error.response.data && error.response.data.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
     }
   },
 
   // Logout user
-  logout: (): void => {
-    localStorage.removeItem(TOKEN_KEY);
+  logout: async (): Promise<void> => {
+    try {
+      // Try to call backend logout endpoint if implemented
+      await api.post('/auth/logout');
+    } catch (error) {
+      // If the backend call fails, just continue with local logout
+      console.error('Logout error:', error);
+    } finally {
+      // Always remove the token from localStorage
+      localStorage.removeItem(TOKEN_KEY);
+    }
   },
 
   // Get current authenticated user
@@ -101,29 +144,13 @@ const authService = {
         return null;
       }
       
-      // TODO: Implement actual API call to validate token and get current user
-      // const response = await api.get<User>('/auth/user');
-      // return response.data;
-      
-      // For development, decode the token (in real app, verify with backend)
-      try {
-        // This would be actual JWT decoding in a real app
-        // const decoded = jwtDecode<DecodedToken>(token);
-        
-        // For development
-        return {
-          id: 1,
-          username: 'testuser',
-          email: 'testuser@example.com',
-          isAdmin: false
-        };
-      } catch {
-        // Invalid token
-        localStorage.removeItem(TOKEN_KEY);
-        return null;
-      }
+      // Verify with backend
+      const response = await api.get('/auth/user');
+      return response.data.user;
     } catch (error) {
       console.error('Get current user failed:', error);
+      // Clear token on error
+      localStorage.removeItem(TOKEN_KEY);
       return null;
     }
   },
@@ -136,12 +163,15 @@ const authService = {
       return false;
     }
     
-    // In a real app, you would verify token expiration
-    // const decoded = jwtDecode<DecodedToken>(token);
-    // return decoded.exp > Date.now() / 1000;
-    
-    // For development
-    return true;
+    try {
+      // Verify token expiration
+      const decoded = jwt_decode.default<DecodedToken>(token);
+      return decoded.exp > Date.now() / 1000;
+    } catch (error) {
+      // Invalid token
+      localStorage.removeItem(TOKEN_KEY);
+      return false;
+    }
   },
 
   // Get authentication token
