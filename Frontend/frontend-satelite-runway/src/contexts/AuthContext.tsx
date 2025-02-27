@@ -20,7 +20,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
@@ -39,11 +39,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Clear error function
   const clearError = () => setError(null);
 
-  // Load user from localStorage on component mount
+  // Load user from localStorage on mount & check token validity
   useEffect(() => {
     const loadUser = async () => {
+      setIsLoading(true);
+
       try {
-        setIsLoading(true);
+        const token = authService.getToken();
+        if (!token || !authService.isAuthenticated()) {
+          setUser(null);
+          return;
+        }
+
+        // Fetch user details
         const currentUser = await authService.getCurrentUser();
         setUser(currentUser);
         setError(null);
@@ -62,15 +70,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (username: string, password: string) => {
     clearError();
     setIsLoading(true);
-    
+
     try {
       const userData = await authService.login({ username, password });
       setUser(userData);
-      router.push('/dashboard');
+
+      // Store return URL before redirecting
+      const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
+      localStorage.removeItem('returnUrl');
+      router.push(returnUrl);
     } catch (err: any) {
       console.error('Login error:', err);
+
+      // Handle API errors properly
       setError(err.message || 'Invalid username or password');
-      throw err; // Re-throw to allow components to also handle the error
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -81,31 +95,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     try {
       await authService.logout();
-      setUser(null);
-      router.push('/login');
     } catch (err) {
       console.error('Logout error:', err);
-      // Even if backend logout fails, we still clear local state
+    } finally {
+      localStorage.removeItem('auth_token'); // Ensure token is removed
       setUser(null);
       router.push('/login');
-    } finally {
       setIsLoading(false);
     }
   };
 
-  // Value object to be provided by the context
-  const value = {
-    user,
-    isAuthenticated: !!user,
-    isLoading,
-    login,
-    logout,
-    error,
-    clearError
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, error, clearError }}>
       {children}
     </AuthContext.Provider>
   );

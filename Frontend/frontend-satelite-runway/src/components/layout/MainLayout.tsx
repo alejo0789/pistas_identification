@@ -2,7 +2,7 @@
  * Main layout component that wraps most pages with header, footer, and navigation
  * filepath: frontend/src/components/layout/MainLayout.tsx
  */
-import React, { ReactNode, useEffect } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Header from './Header';
 import Footer from './Footer';
@@ -20,16 +20,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // Redirect to login if not authenticated and auth is required
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && requireAuth) {
-      router.push('/login');
+    // Only check auth after the initial auth loading is complete
+    if (!isLoading) {
+      if (!isAuthenticated && requireAuth) {
+        router.push(`/login?returnUrl=${encodeURIComponent(router.asPath)}`);
+      }
+      // Mark auth check as complete
+      setIsCheckingAuth(false);
     }
   }, [isAuthenticated, isLoading, requireAuth, router]);
 
-  // Show loading state while checking authentication
-  if (isLoading) {
+  // Show loading state only during initial auth check
+  if (isLoading || (requireAuth && isCheckingAuth)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -37,9 +43,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     );
   }
 
-  // If authentication is required but user is not authenticated, don't render content
+  // For authenticated pages, if not authenticated, don't render (will redirect via useEffect)
   if (requireAuth && !isAuthenticated) {
-    return null; // Will redirect to login due to the useEffect
+    return null;
   }
 
   return (

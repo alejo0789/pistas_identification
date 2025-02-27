@@ -16,10 +16,11 @@
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.476.0",
     "mapbox-gl": "^3.10.0",
-    "next": "15.1.7",
+    "next": "^15.2.0",
     "react": "^19.0.0",
     "react-compare-image": "^3.5.0",
     "react-dom": "^19.0.0",
+    "react-error-boundary": "^5.0.0",
     "tailwind-merge": "^3.0.2",
     "yup": "^1.6.1"
   },

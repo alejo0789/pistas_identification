@@ -14,7 +14,7 @@ const LoginPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const router = useRouter();
-  const { login, error: authError, clearError, isAuthenticated } = useAuth();
+  const { login, error: authError, clearError, isAuthenticated, isLoading } = useAuth();
 
   // Check for query parameters that might contain error messages
   useEffect(() => {
@@ -42,44 +42,41 @@ const LoginPage: React.FC = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!isLoading && isAuthenticated) {
       const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
       localStorage.removeItem('returnUrl');
       router.push(returnUrl);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, isLoading]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    // Clear previous errors
+  
     setFormError(null);
     clearError();
-    
-    // Basic validation
+  
     if (!username.trim()) {
       setFormError('Username is required');
       return;
     }
-    
+  
     if (!password) {
       setFormError('Password is required');
       return;
     }
-    
-    // Submit login request
+  
     setIsSubmitting(true);
-    
+  
     try {
       await login(username, password);
-      // Successful login will trigger the useEffect to redirect
-    } catch (err) {
-      // Error is already set in the auth context
-      console.error('Login submission error:', err);
+      // Redirect happens via useEffect when authenticated
+    } catch (err: any) {
+      setFormError(err.message || 'Login failed');
     } finally {
       setIsSubmitting(false);
     }
   };
+  
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
