@@ -2,9 +2,8 @@
  * Service for authentication-related API calls
  * filepath: frontend/src/services/authService.ts
  */
-import api from './api';
+import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
- // FIXED import
 
 // User interfaces
 export interface User {
@@ -38,6 +37,7 @@ export interface DecodedToken {
 }
 
 const TOKEN_KEY = 'auth_token';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const authService = {
   /**
@@ -45,79 +45,42 @@ const authService = {
    */
   login: async (credentials: UserCredentials): Promise<User> => {
     try {
-      const response = await api.post('/auth/login', credentials);
-
-      if (!response?.data) {
-        throw new Error('Invalid server response');
-      }
-
+      // Force a small delay to ensure UI updates properly
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const response = await axios.post(`${API_URL}/auth/login`, credentials);
+      
       const { token, user } = response.data;
-
-      if (!token) {
-        throw new Error('No authentication token received');
+      
+      if (!token || !user) {
+        throw new Error('Invalid response from server');
       }
-
-      if (!user?.id) {
-        throw new Error('Invalid user data received');
-      }
-
+      
       localStorage.setItem(TOKEN_KEY, token);
+      
       return user;
     } catch (error: any) {
-      console.error('Login failed:', error);
-
-      let errorMessage = 'Login failed. Please try again.';
-      if (error.response) {
-        if (error.response.status === 401) {
-          errorMessage = 'Invalid username or password';
-        } else if (error.response.status === 404) {
-          errorMessage = 'User not found';
-        } else if (error.response.data?.error) {
-          errorMessage = error.response.data.error;
-        }
+      // Add a small delay before throwing the error to ensure UI updates
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      if (error.response && error.response.status === 401) {
+        throw new Error('Invalid username or password');
+      } else if (error.response && error.response.data && error.response.data.error) {
+        throw new Error(error.response.data.error);
       } else if (error.request) {
-        errorMessage = 'No response from server. Please check your connection.';
-      } else if (error.message) {
-        errorMessage = error.message;
+        throw new Error('No response from server');
+      } else {
+        throw new Error('Login failed');
       }
-
-      throw new Error(errorMessage);
-    }
-  },
-
-  /**
-   * Registers a new user
-   */
-  register: async (userData: UserRegistration): Promise<User> => {
-    try {
-      const response = await api.post('/auth/register', userData);
-      return response.data.user;
-    } catch (error: any) {
-      console.error('Registration failed:', error);
-
-      let errorMessage = 'Registration failed';
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      throw new Error(errorMessage);
     }
   },
 
   /**
    * Logs out the user by clearing tokens
    */
-  logout: async (): Promise<void> => {
-    try {
-      await api.post('/auth/logout'); // If the backend has an endpoint for logout
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem('returnUrl');
-    }
+  logout: (): void => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('returnUrl');
   },
 
   /**
@@ -130,20 +93,23 @@ const authService = {
 
       try {
         const decoded: DecodedToken = jwtDecode(token);
-
         if (decoded.exp < Date.now() / 1000) {
           localStorage.removeItem(TOKEN_KEY);
           return null;
         }
-
-        const response = await api.get('/auth/user');
-        return response.data.user;
-      } catch (decodingError) {
+      } catch (error) {
         localStorage.removeItem(TOKEN_KEY);
         return null;
       }
+
+      const response = await axios.get(`${API_URL}/auth/user`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      return response.data.user;
     } catch (error) {
-      console.error('Get current user failed:', error);
       localStorage.removeItem(TOKEN_KEY);
       return null;
     }
@@ -158,7 +124,6 @@ const authService = {
 
     try {
       const decoded: DecodedToken = jwtDecode(token);
-
       return decoded.exp > Date.now() / 1000;
     } catch (error) {
       localStorage.removeItem(TOKEN_KEY);

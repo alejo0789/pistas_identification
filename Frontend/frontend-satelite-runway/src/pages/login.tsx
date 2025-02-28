@@ -12,6 +12,7 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showErrorMessage, setShowErrorMessage] = useState(false);
   
   const router = useRouter();
   const { login, error: authError, clearError, isAuthenticated, isLoading } = useAuth();
@@ -22,10 +23,13 @@ const LoginPage: React.FC = () => {
     
     if (error === 'auth_required') {
       setFormError('Please log in to access this page.');
+      setShowErrorMessage(true);
     } else if (error === 'session_expired') {
       setFormError('Your session has expired. Please log in again.');
+      setShowErrorMessage(true);
     } else if (error === 'auth_error') {
       setFormError('Authentication error. Please log in again.');
+      setShowErrorMessage(true);
     }
     
     // Store return URL in localStorage if provided
@@ -33,50 +37,104 @@ const LoginPage: React.FC = () => {
       localStorage.setItem('returnUrl', returnUrl);
     }
     
-    // Clear form error when component unmounts
     return () => {
+      // Clear errors when component unmounts
       setFormError(null);
       clearError();
     };
   }, [router.query, clearError]);
 
-  // Redirect if already authenticated
+  // Handle auth error from context
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    if (authError) {
+      setFormError(authError);
+      setShowErrorMessage(true);
+    }
+  }, [authError]);
+
+  // Redirect if authenticated - but only if no error is showing
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && !showErrorMessage) {
       const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
       localStorage.removeItem('returnUrl');
       router.push(returnUrl);
     }
-  }, [isAuthenticated, router, isLoading]);
+  }, [isAuthenticated, router, isLoading, showErrorMessage]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
   
+    // Clear previous errors
     setFormError(null);
+    setShowErrorMessage(false);
     clearError();
   
+    // Basic validation
     if (!username.trim()) {
       setFormError('Username is required');
+      setShowErrorMessage(true);
       return;
     }
   
     if (!password) {
       setFormError('Password is required');
+      setShowErrorMessage(true);
       return;
     }
   
     setIsSubmitting(true);
   
     try {
-      await login(username, password);
-      // Redirect happens via useEffect when authenticated
+      // Manual error handling - don't rely on auth context for UI errors
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Invalid username or password');
+        } else {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || `Error: ${response.status}`);
+        }
+      }
+      
+      const data = await response.json();
+      
+      if (!data.token) {
+        throw new Error('No authentication token received');
+      }
+      
+      // Store token
+      localStorage.setItem('auth_token', data.token);
+      
+      // Let context know login succeeded - but we've already handled token storage
+      login(username, password).catch(() => {
+        // Ignore errors here since we're already handling auth manually
+      });
+      
     } catch (err: any) {
-      setFormError(err.message || 'Login failed');
-    } finally {
-      setIsSubmitting(false);
+      // Set error and prevent instant redirect
+      const errorMessage = err instanceof Error ? err.message : 'Login failed';
+      setFormError(errorMessage);
+      setShowErrorMessage(true);
+      
+      // Keep the error visible
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, 300);
+      return;
     }
+    
+    setIsSubmitting(false);
   };
   
+  // We use formError directly now instead of combining with authError
+  const displayError = formError;
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -87,9 +145,9 @@ const LoginPage: React.FC = () => {
         </div>
         
         {/* Display any errors */}
-        {(formError || authError) && (
+        {showErrorMessage && displayError && (
           <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">
-            {formError || authError}
+            {displayError}
           </div>
         )}
         

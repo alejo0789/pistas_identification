@@ -11,7 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => void;
   error: string | null;
   clearError: () => void;
 }
@@ -39,24 +39,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Clear error function
   const clearError = () => setError(null);
 
-  // Load user from localStorage on mount & check token validity
+  // Load user on mount
   useEffect(() => {
     const loadUser = async () => {
       setIsLoading(true);
-
       try {
-        const token = authService.getToken();
-        if (!token || !authService.isAuthenticated()) {
+        if (!authService.isAuthenticated()) {
           setUser(null);
           return;
         }
-
-        // Fetch user details
+        
         const currentUser = await authService.getCurrentUser();
         setUser(currentUser);
-        setError(null);
       } catch (err) {
-        console.error('Error loading user:', err);
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -70,43 +65,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (username: string, password: string) => {
     clearError();
     setIsLoading(true);
-
+    
     try {
       const userData = await authService.login({ username, password });
       setUser(userData);
-
-      // Store return URL before redirecting
-      const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
-      localStorage.removeItem('returnUrl');
-      router.push(returnUrl);
     } catch (err: any) {
-      console.error('Login error:', err);
-
-      // Handle API errors properly
-      setError(err.message || 'Invalid username or password');
+      // Make sure we set the error message and prevent it from being cleared too soon
+      const errorMessage = err?.message || 'Login failed';
+      setError(errorMessage);
       setUser(null);
+      
+      // Return the error so the component knows login failed
+      return Promise.reject(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   // Logout function
-  const logout = async () => {
-    setIsLoading(true);
-    try {
-      await authService.logout();
-    } catch (err) {
-      console.error('Logout error:', err);
-    } finally {
-      localStorage.removeItem('auth_token'); // Ensure token is removed
-      setUser(null);
-      router.push('/login');
-      setIsLoading(false);
-    }
+  const logout = () => {
+    authService.logout();
+    setUser(null);
+    router.push('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, error, clearError }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isAuthenticated: !!user, 
+      isLoading, 
+      login, 
+      logout, 
+      error, 
+      clearError 
+    }}>
       {children}
     </AuthContext.Provider>
   );
