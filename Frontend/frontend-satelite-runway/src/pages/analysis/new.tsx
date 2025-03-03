@@ -46,11 +46,11 @@ const NewAnalysisPage: React.FC = () => {
     name: '',
     latitude: 0,
     longitude: 0,
-    detectRunways: settings.detectRunways,
-    detectAircraft: settings.detectAircraft,
-    detectHouses: settings.detectHouses,
-    detectRoads: settings.detectRoads,
-    detectWaterBodies: settings.detectWaterBodies,
+    detectRunways: settings?.detectRunways ?? true,
+    detectAircraft: settings?.detectAircraft ?? true,
+    detectHouses: settings?.detectHouses ?? true,
+    detectRoads: settings?.detectRoads ?? true,
+    detectWaterBodies: settings?.detectWaterBodies ?? true,
   };
 
   // Handle form submission
@@ -59,12 +59,17 @@ const NewAnalysisPage: React.FC = () => {
     setError(null);
     
     try {
+      // Create the analysis
       const analysis = await analysisService.createAnalysis(values);
-      // Navigate to the analysis details page
-      router.push(`/analysis/${analysis.id}`);
-    } catch (err) {
+      
+      // Show loading message or spinner for 1 second to simulate processing
+      setTimeout(() => {
+        // Navigate to the analysis comparison page instead of details page
+        router.push(`/analysis/compare?id=${analysis.id}`);
+      }, 1000);
+    } catch (err: any) {
       console.error('Error creating analysis:', err);
-      setError('Failed to create analysis. Please try again.');
+      setError(err?.message || 'Failed to create analysis. Please try again.');
       setIsSubmitting(false);
     }
   };
@@ -234,7 +239,7 @@ const NewAnalysisPage: React.FC = () => {
                   type="submit" 
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Creating...' : 'Create Analysis'}
+                  {isSubmitting ? 'Creating & Processing...' : 'Create Analysis'}
                 </Button>
               </div>
             </Form>

@@ -15,21 +15,33 @@ export interface AnalysisInput {
   detectWaterBodies: boolean;
 }
 
+export interface AnalysisImage {
+  id: number;
+  analysis_id: number;
+  image_date: string | null;
+  processing_date: string;
+  image_path: string | null;
+  runway_detected: boolean;
+  runway_length: number | null;
+  runway_width: number | null;
+  aircraft_count: number;
+  house_count: number;
+  road_count: number;
+  water_body_count: number;
+  status: string;
+  source_type: string;
+  created_at: string;
+}
+
 export interface Analysis {
   id: number;
   user_id: number;
   name: string;
   latitude: number;
   longitude: number;
-  analysis_date: string;
-  image_date: string | null;
-  runway_detected: boolean;
-  aircraft_count: number;
-  house_count: number;
-  road_count: number;
-  water_body_count: number;
   created_at: string;
   updated_at?: string;
+  images: AnalysisImage[];
 }
 
 export interface AnalysisResponse {
@@ -43,6 +55,15 @@ export interface AnalysesResponse {
   pages: number;
   page: number;
   per_page: number;
+}
+
+export interface ImageResponse {
+  message?: string;
+  image: AnalysisImage;
+}
+
+export interface ImagesResponse {
+  images: AnalysisImage[];
 }
 
 const analysisService = {
@@ -81,6 +102,29 @@ const analysisService = {
   // Delete an analysis
   deleteAnalysis: async (id: number): Promise<void> => {
     await api.delete(`/analysis/${id}`);
+  },
+
+  // Get all images for an analysis
+  getAnalysisImages: async (analysisId: number): Promise<AnalysisImage[]> => {
+    const response = await api.get<ImagesResponse>(`/analysis/${analysisId}/images`);
+    return response.data.images;
+  },
+
+  // Get a specific image for an analysis
+  getAnalysisImage: async (analysisId: number, imageId: number): Promise<AnalysisImage> => {
+    const response = await api.get<ImageResponse>(`/analysis/${analysisId}/images/${imageId}`);
+    return response.data.image;
+  },
+
+  // Add a new image to an analysis
+  addAnalysisImage: async (analysisId: number, imageDate?: string): Promise<AnalysisImage> => {
+    const payload: Record<string, any> = { source_type: 'api' };
+    if (imageDate) {
+      payload.image_date = imageDate;
+    }
+    
+    const response = await api.post<ImageResponse>(`/analysis/${analysisId}/images`, payload);
+    return response.data.image;
   },
 
   // Process recent satellite image
@@ -148,6 +192,20 @@ const analysisService = {
   getReportPreview: async (analysisId: number): Promise<any> => {
     const response = await api.get(`/reports/${analysisId}/preview`);
     return response.data.preview;
+  },
+
+  // Helper functions for working with analyses and images
+  getLatestImage: (analysis: Analysis): AnalysisImage | null => {
+    if (!analysis.images || analysis.images.length === 0) {
+      return null;
+    }
+    
+    // Sort images by date (newest first) and return the first one
+    return [...analysis.images].sort((a, b) => {
+      const dateA = a.image_date ? new Date(a.image_date).getTime() : 0;
+      const dateB = b.image_date ? new Date(b.image_date).getTime() : 0;
+      return dateB - dateA;
+    })[0];
   }
 };
 
